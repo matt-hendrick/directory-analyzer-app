@@ -1,7 +1,8 @@
-use std::cmp::{max, min, Ordering};
+use std::cmp::{min, Ordering};
 use std::collections::BinaryHeap;
 use std::env::args;
-use std::fs::{self, DirEntry, ReadDir};
+use std::fs::{self, ReadDir};
+use std::time::Instant;
 
 #[derive(Debug)]
 struct FileInfo {
@@ -71,17 +72,22 @@ impl PartialEq for FileInfo {
 }
 
 fn main() {
-    let number_of_files: usize = parse_number_of_files();
+    let start: Instant = Instant::now();
+
     let dir: String = parse_dir();
 
-    let mut heap: BinaryHeap<FileInfo> = BinaryHeap::new();
-    recursively_inspect_sub_dirs(dir, &mut heap, number_of_files);
+    let number_of_files: usize = parse_number_of_files();
 
-    for (i, file) in heap.into_sorted_vec().iter().enumerate() {
+    let mut largest_file_heap: BinaryHeap<FileInfo> = BinaryHeap::new();
+    recursively_get_largest_files(dir, &mut largest_file_heap, number_of_files);
+
+    for (i, file) in largest_file_heap.into_sorted_vec().iter().enumerate() {
         println!("File Number: {}", i + 1);
         file.pretty_print();
         println!("---------------------------------------");
     }
+
+    println!("Time elapsed: {:?}", start.elapsed());
 }
 
 fn parse_number_of_files() -> usize {
@@ -107,29 +113,34 @@ fn parse_dir() -> String {
     }
 }
 
-fn recursively_inspect_sub_dirs(
+fn recursively_get_largest_files(
     dir: String,
     largest_file_heap: &mut BinaryHeap<FileInfo>,
     number_of_files: usize,
 ) {
-    let paths: ReadDir = fs::read_dir(dir).unwrap();
+    let path_result: Result<ReadDir, std::io::Error> = fs::read_dir(&dir);
 
-    for path in paths {
-        let path_name: String = String::from(path.as_ref().unwrap().path().to_str().unwrap());
-        let file_name: String = path.as_ref().unwrap().file_name().into_string().unwrap();
-        let is_dir: bool = path.as_ref().unwrap().metadata().unwrap().is_dir();
-        let file_size: u64 = path.as_ref().unwrap().metadata().unwrap().len();
-        if is_dir {
-            recursively_inspect_sub_dirs(path_name, largest_file_heap, number_of_files);
-        } else {
-            let new_file: FileInfo = FileInfo::new(file_name, file_size, path_name);
-            if largest_file_heap.len() >= number_of_files
-                && new_file.size > largest_file_heap.peek().unwrap().size
-            {
-                largest_file_heap.pop();
-            } else if largest_file_heap.len() < number_of_files {
-                largest_file_heap.push(new_file)
+    if path_result.is_ok() {
+        let paths = path_result.unwrap();
+        for path in paths {
+            let path_name: String = String::from(path.as_ref().unwrap().path().to_str().unwrap());
+            let file_name: String = path.as_ref().unwrap().file_name().into_string().unwrap();
+            let is_dir: bool = path.as_ref().unwrap().metadata().unwrap().is_dir();
+            let file_size: u64 = path.as_ref().unwrap().metadata().unwrap().len();
+            if is_dir {
+                recursively_get_largest_files(path_name, largest_file_heap, number_of_files);
+            } else {
+                let new_file: FileInfo = FileInfo::new(file_name, file_size, path_name);
+                if largest_file_heap.len() >= number_of_files
+                    && new_file.size > largest_file_heap.peek().unwrap().size
+                {
+                    largest_file_heap.pop();
+                } else if largest_file_heap.len() < number_of_files {
+                    largest_file_heap.push(new_file)
+                }
             }
         }
+    } else {
+        println!("Error analyzing directory {}", &dir);
     }
 }
