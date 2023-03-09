@@ -1,0 +1,29 @@
+<div class="container">
+  <h1>Directory Analyzer</h1>
+  <div class="row">
+    <form (submit)="analyzeDir($event, analyze_dir.value)">
+      <input
+        #analyze_dir
+        id="analyze-dir-input"
+        placeholder="Enter the relative path to a directory"
+      />
+      <button type="submit">Anazlyze Directory</button>
+    </form>
+  </div>
+  <div *ngFor="let largeFile of largestFileList; let fileIndex = index">
+    <div class="flex" *ngIf="fileIndex === 0">
+      <div class="file-index">File Index</div>
+      <div class="file-info">File Name</div>
+      <div class="file-info">File Size</div>
+      <div class="file-info">File Path</div>
+    </div>
+    <div class="flex">
+      <div class="file-index">{{ fileIndex + 1 }}</div>
+      <div class="file-info">{{ largeFile.name }}</div>
+      <div class="file-info">{{ largeFile.size }}</div>
+      <div class="file-info">{{ largeFile.path }}</div>
+    </div>
+  </div>
+
+  <div *ngIf="loading">Loading...</div>
+</div>

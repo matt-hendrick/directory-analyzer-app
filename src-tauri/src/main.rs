@@ -1,10 +1,15 @@
+// Prevents additional console window on Windows in release, DO NOT REMOVE!!
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+use serde::ser::{Serialize, SerializeMap, SerializeSeq, SerializeStruct, Serializer};
+use serde_json;
 use std::cmp::{min, Ordering};
 use std::collections::BinaryHeap;
 use std::env::args;
-use std::fs::{self, ReadDir};
+use std::fs::{self, File, ReadDir};
 use std::time::Instant;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FileInfo {
     name: String,
     size: u64,
@@ -71,23 +76,56 @@ impl PartialEq for FileInfo {
     }
 }
 
+impl Serialize for FileInfo {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // 3 is the number of fields in the struct.
+        let mut state: <S as Serializer>::SerializeStruct =
+            serializer.serialize_struct("FileInfo", 3)?;
+        state.serialize_field("name", &self.name)?;
+        state.serialize_field(
+            "size",
+            &Self::convert_bytes_to_pretty_string(self.size as f64),
+        )?;
+        state.serialize_field("path", &self.path)?;
+        state.end()
+    }
+}
+
 fn main() {
+    tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![analyze_dir])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
+
+#[tauri::command]
+fn analyze_dir(name: &str) -> String {
     let start: Instant = Instant::now();
 
-    let dir: String = parse_dir();
+    let dir: String = name.to_string();
 
-    let number_of_files: usize = parse_number_of_files();
+    let number_of_files: usize = 20;
+    // let number_of_files: usize = parse_number_of_files();
 
     let mut largest_file_heap: BinaryHeap<FileInfo> = BinaryHeap::new();
     recursively_get_largest_files(dir, &mut largest_file_heap, number_of_files);
 
-    for (i, file) in largest_file_heap.into_sorted_vec().iter().enumerate() {
-        println!("File Number: {}", i + 1);
-        file.pretty_print();
-        println!("---------------------------------------");
-    }
+    let largest: FileInfo = largest_file_heap.peek().unwrap().clone();
+
+    // for (i, file) in largest_file_heap.into_sorted_vec().iter().enumerate() {
+    //     if i == 0 {
+    //         largest = file.clone();
+    //     }
+    //     println!("File Number: {}", i + 1);
+    //     file.pretty_print();
+    //     println!("---------------------------------------");
+    // }
 
     println!("Time elapsed: {:?}", start.elapsed());
+    serde_json::to_string(&largest_file_heap.into_sorted_vec()).unwrap()
 }
 
 fn parse_number_of_files() -> usize {

@@ -1,0 +1,16 @@
+.flex {
+  display: flex;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.file-index {
+  width: 10%;
+}
+
+.file-info {
+  width: 30%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
